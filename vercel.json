@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/daily-report",
+      "schedule": "50 18 * * *"
+    },
+    {
+      "path": "/api/amocrm-crm-check",
+      "schedule": "0 */3 * * *"
+    }
+  ]
+}
