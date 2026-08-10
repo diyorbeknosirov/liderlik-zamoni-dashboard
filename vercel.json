@@ -1,4 +1,4 @@
-{
+﻿{
   "crons": [
     {
       "path": "/api/daily-report",
@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/amocrm-crm-check",
-      "schedule": "0 */3 * * *"
+      "schedule": "0 6 * * *"
     }
   ]
 }
