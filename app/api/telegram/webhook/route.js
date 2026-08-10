@@ -1,4 +1,4 @@
-﻿/**
+/**
  * app/api/telegram/webhook/route.js
  * ------------------------------------
  * Telegram bot uchun YAGONA kirish nuqtasi.
@@ -8,7 +8,7 @@
  *   2. Qiziqish tanlash: Mentor / Kurs / Umumiy / Barchasi
  *   3. Bosqich tanlash: 0'dan boshlash / Mavjudni rivojlantirish
  *   4. Shu segmentga mos kanallar ko'rsatiladi + "Batafsil ma'lumot" tugmasi
- *   5. "Batafsil ma'lumot" -> ism, telefon, bosqich QAYTADAN so'raladi
+ *   5. "Batafsil ma'lumot" -> mavjud ism/telefon/bosqich ishlatiladi (qayta so'ralmaydi)
  *   6. Operatorlar guruhiga lid karta sifatida yuboriladi ("Men olaman" tugmasi)
  *   7. Operator lidni "oladi" -> shaxsiy xabar orqali to'liq ma'lumot oladi
  *   8. Operator /mijozlarim orqali o'z lidlarini ko'radi, Demo sana/vaqt kiritadi
@@ -83,7 +83,7 @@ async function handleStart(message) {
   if (existingLead) {
     await sendMessage(
       userId,
-      `Xush kelibsiz qaytganingiz bilan, ${message.from.first_name}! 👋`
+      `Xush kelibsiz qaytganingiz bilan, ${message.from.first_name}! ??`
     );
     if (!existingLead.interest_type) {
       await askInterest(userId);
@@ -97,7 +97,7 @@ async function handleStart(message) {
 
   await sendMessage(
     userId,
-    "👋 Assalomu alaykum! Biznes-kursimizga xush kelibsiz.\n\n" +
+    "?? Assalomu alaykum! Biznes-kursimizga xush kelibsiz.\n\n" +
       "Avval tanishib olamiz. Iltimos, to'liq ism va familiyangizni yozing:\n" +
       "<i>(masalan: Sardorbek Aliyev)</i>"
   );
@@ -137,7 +137,7 @@ async function handleContact(message) {
 
     await sendMessage(
       userId,
-      "✅ Ro'yxatdan muvaffaqiyatli o'tdingiz!\n\nEndi bir nechta savol beraman, shunda sizga aynan kerakli ma'lumotni yuboraman.",
+      "? Ro'yxatdan muvaffaqiyatli o'tdingiz!\n\nEndi bir nechta savol beraman, shunda sizga aynan kerakli ma'lumotni yuboraman.",
       removeKeyboard()
     );
     await askInterest(userId);
@@ -153,7 +153,7 @@ async function handleContact(message) {
       .eq("telegram_user_id", userId);
 
     await sendMessage(userId, "Bosqichingizni tasdiqlang:", removeKeyboard());
-    await sendMessage(userId, "👇", confirmStageKeyboard());
+    await sendMessage(userId, "??", confirmStageKeyboard());
     return;
   }
 }
@@ -180,11 +180,11 @@ async function handleTextMessage(message) {
       .from("bot_fsm_state")
       .update({ state: "waiting_phone", data: { full_name: text } })
       .eq("telegram_user_id", userId);
-    await sendMessage(userId, "Rahmat! Endi telefon raqamingizni yuboring 👇", phoneShareKeyboard());
+    await sendMessage(userId, "Rahmat! Endi telefon raqamingizni yuboring ??", phoneShareKeyboard());
     return;
   }
   if (fsm.state === "waiting_phone") {
-    await sendMessage(userId, "Iltimos, pastdagi '📱 Telefon raqamni yuborish' tugmasini bosing.", phoneShareKeyboard());
+    await sendMessage(userId, "Iltimos, pastdagi '?? Telefon raqamni yuborish' tugmasini bosing.", phoneShareKeyboard());
     return;
   }
 
@@ -198,7 +198,7 @@ async function handleTextMessage(message) {
       .from("bot_fsm_state")
       .update({ state: "waiting_details_phone", data: { full_name: text } })
       .eq("telegram_user_id", userId);
-    await sendMessage(userId, "Endi telefon raqamingizni yuboring 👇", phoneShareKeyboard());
+    await sendMessage(userId, "Endi telefon raqamingizni yuboring ??", phoneShareKeyboard());
     return;
   }
   if (fsm.state === "waiting_details_phone") {
@@ -237,7 +237,7 @@ async function handleCallbackQuery(callbackQuery) {
       .update({ interest_type: interest })
       .eq("telegram_user_id", userId);
 
-    await editMessageText(chatId, messageId, `Tanlandi: ${INTEREST_LABELS[interest]} ✅`);
+    await editMessageText(chatId, messageId, `Tanlandi: ${INTEREST_LABELS[interest]} ?`);
     await sendMessage(userId, "Endi bosqichingizni tanlang:", stageKeyboard());
     await answerCallbackQuery(callbackQuery.id);
     return;
@@ -252,29 +252,14 @@ async function handleCallbackQuery(callbackQuery) {
       .select("interest_type")
       .single();
 
-    await editMessageText(chatId, messageId, `Tanlandi: ${STAGE_LABELS[stage]} ✅`);
+    await editMessageText(chatId, messageId, `Tanlandi: ${STAGE_LABELS[stage]} ?`);
     await showResourceChannels(userId, lead?.interest_type, stage);
     await answerCallbackQuery(callbackQuery.id);
     return;
   }
 
   if (data === "want_details") {
-    await supabaseAdmin
-      .from("bot_fsm_state")
-      .upsert({ telegram_user_id: userId, state: "waiting_details_name", data: {} });
-
-    await sendMessage(
-      userId,
-      "Ajoyib! Operatorimiz siz bilan bog'lanishi uchun ma'lumotlaringizni aniqlashtiramiz.\n\n" +
-        "Iltimos, to'liq ism-familiyangizni yozing:"
-    );
-    await answerCallbackQuery(callbackQuery.id);
-    return;
-  }
-
-  if (data.startsWith("details_stage:")) {
-    const stage = data.split(":")[1];
-    await finalizeDetailsRequest(userId, stage, chatId, messageId);
+    await finalizeDetailsRequest(userId, chatId, messageId);
     await answerCallbackQuery(callbackQuery.id);
     return;
   }
@@ -326,7 +311,7 @@ async function showResourceChannels(userId, interestType, businessStage) {
 
   await sendMessage(
     userId,
-    "📚 Sizga mos manbalarni tayyorladik. Quyidagi kanallardan foydalanishingiz mumkin:",
+    "?? Sizga mos manbalarni tayyorladik. Quyidagi kanallardan foydalanishingiz mumkin:",
     resourceChannelsKeyboard(list)
   );
 }
@@ -334,45 +319,31 @@ async function showResourceChannels(userId, interestType, businessStage) {
 // ============================================================================
 // 4) "BATAFSIL MA'LUMOT" -> OPERATORLAR GURUHIGA YUBORISH
 // ============================================================================
-async function finalizeDetailsRequest(userId, stage, chatId, messageId) {
-  const { data: fsm } = await supabaseAdmin
-    .from("bot_fsm_state")
-    .select("*")
-    .eq("telegram_user_id", userId)
-    .maybeSingle();
-
-  const fullName = fsm?.data?.full_name || "-";
-  const phone = fsm?.data?.phone || "-";
-
+async function finalizeDetailsRequest(userId, chatId, messageId) {
+  // Ism, telefon va bosqich allaqachon ro'yxatdan o'tish bosqichida olingan -
+  // shuning uchun bu yerda hech narsa qayta so'ralmaydi, faqat statusi yangilanadi.
   const { data: lead } = await supabaseAdmin
     .from("telegram_leads")
-    .update({
-      full_name: fullName,
-      phone,
-      business_stage: stage,
-      status: "Operatorga yuborildi",
-    })
+    .update({ status: "Operatorga yuborildi" })
     .eq("telegram_user_id", userId)
     .select("*")
     .single();
 
-  await supabaseAdmin.from("bot_fsm_state").delete().eq("telegram_user_id", userId);
-
-  await editMessageText(chatId, messageId, "✅ Ma'lumotlaringiz qabul qilindi!");
+  await editMessageText(chatId, messageId, "? Ma'lumotlaringiz qabul qilindi!");
   await sendMessage(
     userId,
-    "Tez orada operatorimiz siz bilan bog'lanadi. Biroz kuting 🙏"
+    "Tez orada operatorimiz siz bilan bog'lanadi. Biroz kuting ??"
   );
 
   if (lead) {
     await sendMessage(
       OPERATORS_GROUP_ID,
-      "🔔 <b>Yangi lid!</b>\n\n" +
-        `👤 ${lead.full_name}\n` +
-        `📞 ${lead.phone}\n` +
-        `🎯 Qiziqishi: ${INTEREST_LABELS[lead.interest_type] || "-"}\n` +
-        `📊 Bosqichi: ${STAGE_LABELS[lead.business_stage] || "-"}\n` +
-        `🆔 @${lead.telegram_username || "-"}`,
+      "?? <b>Yangi lid!</b>\n\n" +
+        `?? ${lead.full_name}\n` +
+        `?? ${lead.phone}\n` +
+        `?? Qiziqishi: ${INTEREST_LABELS[lead.interest_type] || "-"}\n` +
+        `?? Bosqichi: ${STAGE_LABELS[lead.business_stage] || "-"}\n` +
+        `?? @${lead.telegram_username || "-"}`,
       claimKeyboard(lead.id)
     );
   }
@@ -430,21 +401,21 @@ async function handleClaim(callbackQuery, leadId) {
   await editMessageText(
     callbackQuery.message.chat.id,
     callbackQuery.message.message_id,
-    `${originalText}\n\n✅ <b>${operatorName}</b> oldi (${formatDateTimeUz(new Date())})`,
+    `${originalText}\n\n? <b>${operatorName}</b> oldi (${formatDateTimeUz(new Date())})`,
     { inline_keyboard: [] }
   );
 
   await sendMessage(
     operatorId,
-    "✅ Siz yangi mijozni oldingiz!\n\n" +
-      `👤 ${lead.full_name}\n` +
-      `📞 ${lead.phone}\n` +
-      `🎯 Qiziqishi: ${INTEREST_LABELS[lead.interest_type] || "-"}\n` +
-      `📊 Bosqichi: ${STAGE_LABELS[lead.business_stage] || "-"}\n\n` +
+    "? Siz yangi mijozni oldingiz!\n\n" +
+      `?? ${lead.full_name}\n` +
+      `?? ${lead.phone}\n` +
+      `?? Qiziqishi: ${INTEREST_LABELS[lead.interest_type] || "-"}\n` +
+      `?? Bosqichi: ${STAGE_LABELS[lead.business_stage] || "-"}\n\n` +
       "Mijoz bilan aloqaga chiqing. Demoga yozilsa, /mijozlarim buyrug'i orqali sanani belgilashingiz mumkin."
   );
 
-  await answerCallbackQuery(callbackQuery.id, "Mijoz sizga biriktirildi ✅");
+  await answerCallbackQuery(callbackQuery.id, "Mijoz sizga biriktirildi ?");
 }
 
 // ============================================================================
@@ -461,20 +432,20 @@ async function handleMyLeadsCommand(message) {
     .order("assigned_at", { ascending: false });
 
   if (!leads || leads.length === 0) {
-    await sendMessage(operatorId, "📭 Hozircha sizga biriktirilgan faol mijozlar yo'q.");
+    await sendMessage(operatorId, "?? Hozircha sizga biriktirilgan faol mijozlar yo'q.");
     return;
   }
 
   for (const lead of leads) {
     const demoInfo = lead.demo_datetime
-      ? `\n📅 Demo: ${formatDateTimeUz(new Date(lead.demo_datetime))}`
+      ? `\n?? Demo: ${formatDateTimeUz(new Date(lead.demo_datetime))}`
       : "";
     await sendMessage(
       operatorId,
-      `👤 <b>${lead.full_name}</b>\n📞 ${lead.phone}\n📊 Status: ${lead.status}${demoInfo}`,
+      `?? <b>${lead.full_name}</b>\n?? ${lead.phone}\n?? Status: ${lead.status}${demoInfo}`,
       {
         inline_keyboard: [
-          [{ text: "📅 Demo belgilash", callback_data: `set_demo:${lead.id}` }],
+          [{ text: "?? Demo belgilash", callback_data: `set_demo:${lead.id}` }],
         ],
       }
     );
@@ -499,7 +470,7 @@ async function handleOperatorDemoInput(operatorId, text, leadId) {
   if (!match) {
     await sendMessage(
       operatorId,
-      "❌ Format noto'g'ri. <code>KK.OO.YYYY SS:DD</code> formatida yuboring (masalan: 16.08.2026 19:00)."
+      "? Format noto'g'ri. <code>KK.OO.YYYY SS:DD</code> formatida yuboring (masalan: 16.08.2026 19:00)."
     );
     return;
   }
@@ -508,7 +479,7 @@ async function handleOperatorDemoInput(operatorId, text, leadId) {
   const demoDate = new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min));
 
   if (demoDate.getTime() <= Date.now()) {
-    await sendMessage(operatorId, "❌ Demo vaqti kelajakda bo'lishi kerak.");
+    await sendMessage(operatorId, "? Demo vaqti kelajakda bo'lishi kerak.");
     return;
   }
 
@@ -526,13 +497,13 @@ async function handleOperatorDemoInput(operatorId, text, leadId) {
   const dateStr = formatDateTimeUz(demoDate);
   const firstName = (lead.full_name || "").split(" ")[0];
 
-  await sendMessage(operatorId, `✅ Demo belgilandi: ${lead.full_name} - ${dateStr}`);
+  await sendMessage(operatorId, `? Demo belgilandi: ${lead.full_name} - ${dateStr}`);
 
   // 1) Mijozga darhol tasdiq
   await sendMessage(
     lead.telegram_user_id,
-    `🎉 ${firstName}, tabriklaymiz! Siz Demo-darsga yozildingiz.\n\n` +
-      `📅 Sana va vaqt: <b>${dateStr}</b>\n\n` +
+    `?? ${firstName}, tabriklaymiz! Siz Demo-darsga yozildingiz.\n\n` +
+      `?? Sana va vaqt: <b>${dateStr}</b>\n\n` +
       "Ko'rishguncha! Savol bo'lsa, operatoringizga yozishingiz mumkin."
   );
 
@@ -545,7 +516,7 @@ async function handleOperatorDemoInput(operatorId, text, leadId) {
     {
       telegram_user_id: lead.telegram_user_id,
       message_text:
-        `👋 ${firstName}, ertaga soat ${dateStr.split(" ")[1]} da Demo-darsimiz bo'ladi.\n\n` +
+        `?? ${firstName}, ertaga soat ${dateStr.split(" ")[1]} da Demo-darsimiz bo'ladi.\n\n` +
         "Kelishingizga ishonch hosil qilsak bo'ladimi?",
       reply_markup: demoConfirmDayKeyboard(lead.id),
       send_at: dayBefore.toISOString(),
@@ -553,7 +524,7 @@ async function handleOperatorDemoInput(operatorId, text, leadId) {
     },
     {
       telegram_user_id: lead.telegram_user_id,
-      message_text: `${firstName}, yordamdamisiz? Demoga kelayapsizmi? 😊`,
+      message_text: `${firstName}, yordamdamisiz? Demoga kelayapsizmi? ??`,
       reply_markup: demoConfirmHourKeyboard(lead.id),
       send_at: hourBefore.toISOString(),
       purpose: "demo_hour_before",
@@ -582,7 +553,7 @@ async function handleDemoDayResponse(callbackQuery, data) {
     .eq("id", leadId);
 
   if (answer === "yes") {
-    await editMessageText(chatId, messageId, "Ajoyib, ertaga ko'rishguncha! 😊", { inline_keyboard: [] });
+    await editMessageText(chatId, messageId, "Ajoyib, ertaga ko'rishguncha! ??", { inline_keyboard: [] });
   } else {
     await editMessageText(
       chatId,
@@ -590,7 +561,7 @@ async function handleDemoDayResponse(callbackQuery, data) {
       "Tushunarli. Boshqa qulay sana kerak bo'lsa, operatoringizga yozing.",
       { inline_keyboard: [] }
     );
-    await notifyOperatorAboutLead(leadId, "⚠️ Mijoz ertangi demoga kela olmasligini aytdi.");
+    await notifyOperatorAboutLead(leadId, "?? Mijoz ertangi demoga kela olmasligini aytdi.");
   }
   await answerCallbackQuery(callbackQuery.id);
 }
@@ -606,10 +577,10 @@ async function handleDemoHourResponse(callbackQuery, data) {
     .eq("id", leadId);
 
   if (answer === "yes") {
-    await editMessageText(chatId, messageId, "Zo'r! Kutamiz 🙌", { inline_keyboard: [] });
+    await editMessageText(chatId, messageId, "Zo'r! Kutamiz ??", { inline_keyboard: [] });
   } else {
-    await editMessageText(chatId, messageId, "Tushunarli, kutamiz. ⏳", { inline_keyboard: [] });
-    await notifyOperatorAboutLead(leadId, "⚠️ Mijoz bugungi demoga kechikishi yoki kela olmasligini aytdi (shoshilinch)!");
+    await editMessageText(chatId, messageId, "Tushunarli, kutamiz. ?", { inline_keyboard: [] });
+    await notifyOperatorAboutLead(leadId, "?? Mijoz bugungi demoga kechikishi yoki kela olmasligini aytdi (shoshilinch)!");
   }
   await answerCallbackQuery(callbackQuery.id);
 }
@@ -628,7 +599,7 @@ async function handleRating(callbackQuery, data) {
   await editMessageText(
     chatId,
     messageId,
-    `Bahoyingiz uchun rahmat! 🙏 (${rating}/10)`,
+    `Bahoyingiz uchun rahmat! ?? (${rating}/10)`,
     { inline_keyboard: [] }
   );
   await answerCallbackQuery(callbackQuery.id, "Rahmat!");
@@ -645,6 +616,6 @@ async function notifyOperatorAboutLead(leadId, note) {
 
   await sendMessage(
     lead.assigned_operator_id,
-    `${note}\n\n👤 ${lead.full_name}\n📞 ${lead.phone}`
+    `${note}\n\n?? ${lead.full_name}\n?? ${lead.phone}`
   );
 }
