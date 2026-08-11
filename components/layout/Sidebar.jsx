@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutGrid, Plus, Users, CircleDollarSign, Calendar, FileText, LogOut, UserCog, ListTodo, BarChart3, Clock, Crown, Mic, DoorOpen, CheckCircle2, Award, GraduationCap, Wallet } from "lucide-react";
+import { LayoutGrid, Plus, Users, CircleDollarSign, Calendar, FileText, LogOut, UserCog, ListTodo, BarChart3, Clock, Crown, Mic, DoorOpen, CheckCircle2, Award, GraduationCap, Wallet, Send } from "lucide-react";
 import { COLORS } from "@/lib/constants";
 import Avatar from "@/components/ui/Avatar";
 import { useAuth } from "@/context/AuthContext";
@@ -147,3 +147,4 @@ export default function Sidebar({ mobileOpen, setMobileOpen, hasCheckedIn, hasCh
     </>
   );
 }
+
