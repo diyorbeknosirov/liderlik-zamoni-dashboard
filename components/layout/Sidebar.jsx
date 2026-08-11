@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -30,6 +30,7 @@ const ADMIN_NAV = [
   { href: "/dashboard/admin/scripts", label: "Skriptlar", icon: FileText },
   { href: "/dashboard/call-analysis", label: "Qo'ng'iroq tahlili", icon: Mic },
   { href: "/dashboard/admin/call-quality", label: "Qo'ng'iroq reytingi", icon: Award },
+  { href: "/dashboard/telegram-bot", label: "Telegram Bot", icon: Send },
   { href: "/dashboard/admin/tasks", label: "Tasklar", icon: ListTodo },
   { href: "/dashboard/profile", label: "Profil sozlamalari", icon: UserCog },
 ];
@@ -147,4 +148,3 @@ export default function Sidebar({ mobileOpen, setMobileOpen, hasCheckedIn, hasCh
     </>
   );
 }
-
