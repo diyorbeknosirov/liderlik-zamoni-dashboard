@@ -20,8 +20,8 @@
  * "Telegramni ulash" tugmasidan kelgan deep-link, operatorning Telegram ID'sini
  * profiles jadvaliga yozadi.
  *
- * Bot menyusi: /menu, /manzil, /mentor, /kurs buyruqlari (BotFather'da
- * ro'yxatga olinishi kerak - README'ga qarang).
+ * Bot menyusi: /menu, /manzil, /mentor, /kurs buyruqlari VA doimiy pastki
+ * tugmalar (ReplyKeyboard) - ikkalasi ham bir xil kontentni ko'rsatadi.
  */
 
 import { NextResponse } from "next/server";
@@ -44,6 +44,8 @@ import {
   INTEREST_LABELS,
   STAGE_LABELS,
   mainMenuKeyboard,
+  mainReplyKeyboard,
+  MAIN_MENU_BUTTONS,
 } from "@/lib/telegramBot/telegram";
 import { MENTOR_INFO_TEXT, KURS_INFO_TEXT, ADDRESS_INFO_TEXT } from "@/lib/telegramBot/menuContent";
 
@@ -75,6 +77,14 @@ export async function POST(req) {
       await sendMessage(update.message.from.id, MENTOR_INFO_TEXT);
     } else if (update.message?.text === "/kurs") {
       await sendMessage(update.message.from.id, KURS_INFO_TEXT);
+    } else if (update.message?.text === MAIN_MENU_BUTTONS.address) {
+      await sendMessage(update.message.from.id, ADDRESS_INFO_TEXT);
+    } else if (update.message?.text === MAIN_MENU_BUTTONS.mentor) {
+      await sendMessage(update.message.from.id, MENTOR_INFO_TEXT);
+    } else if (update.message?.text === MAIN_MENU_BUTTONS.kurs) {
+      await sendMessage(update.message.from.id, KURS_INFO_TEXT);
+    } else if (update.message?.text === MAIN_MENU_BUTTONS.contact) {
+      await finalizeDetailsRequestSimple(update.message.from.id);
     } else if (update.message?.text) {
       await handleTextMessage(update.message);
     } else if (update.callback_query) {
@@ -109,7 +119,8 @@ async function handleStart(message) {
   if (existingLead) {
     await sendMessage(
       userId,
-      `Xush kelibsiz qaytganingiz bilan, ${message.from.first_name}! 👋`
+      `Xush kelibsiz qaytganingiz bilan, ${message.from.first_name}! 👋`,
+      mainReplyKeyboard()
     );
     if (!existingLead.interest_type) {
       await askInterest(userId);
@@ -205,7 +216,7 @@ async function handleContact(message) {
     await sendMessage(
       userId,
       "✅ Ro'yxatdan muvaffaqiyatli o'tdingiz!\n\nEndi bir nechta savol beraman, shunda sizga aynan kerakli ma'lumotni yuboraman.",
-      removeKeyboard()
+      mainReplyKeyboard()
     );
     await askInterest(userId);
     return;
@@ -371,7 +382,7 @@ async function showResourceChannels(userId, interestType, businessStage) {
 // ============================================================================
 // 4) "BATAFSIL MA'LUMOT" -> OPERATORLAR GURUHIGA YUBORISH
 // ============================================================================
-async function finalizeDetailsRequest(userId, chatId, messageId) {
+async function finalizeDetailsRequestCore(userId) {
   const { data: lead } = await supabaseAdmin
     .from("telegram_leads")
     .update({ status: "Operatorga yuborildi" })
@@ -379,7 +390,6 @@ async function finalizeDetailsRequest(userId, chatId, messageId) {
     .select("*")
     .single();
 
-  await editMessageText(chatId, messageId, "✅ Ma'lumotlaringiz qabul qilindi!");
   await sendMessage(
     userId,
     "Tez orada operatorimiz siz bilan bog'lanadi. Biroz kuting 🙏"
@@ -397,6 +407,15 @@ async function finalizeDetailsRequest(userId, chatId, messageId) {
       claimKeyboard(lead.id)
     );
   }
+}
+
+async function finalizeDetailsRequest(userId, chatId, messageId) {
+  await editMessageText(chatId, messageId, "✅ Ma'lumotlaringiz qabul qilindi!");
+  await finalizeDetailsRequestCore(userId);
+}
+
+async function finalizeDetailsRequestSimple(userId) {
+  await finalizeDetailsRequestCore(userId);
 }
 
 // ============================================================================
