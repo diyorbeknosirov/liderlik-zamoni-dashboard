@@ -11,9 +11,14 @@
  *   5. "Batafsil ma'lumot" -> mavjud ism/telefon/bosqich ishlatiladi (qayta so'ralmaydi)
  *   6. Operatorlar guruhiga lid karta sifatida yuboriladi ("Men olaman" tugmasi)
  *   7. Operator lidni "oladi" -> shaxsiy xabar orqali to'liq ma'lumot oladi
+ *      (agar dashboard hisobiga ulangan bo'lsa, haqiqiy ism-familiyasi ishlatiladi)
  *   8. Operator /mijozlarim orqali o'z lidlarini ko'radi, Demo sana/vaqt kiritadi
  *   9. Mijozga avtomatik: darhol tasdiq, 1 kun oldin so'rov, 1 soat oldin eslatma
  *  10. Demo boshlangandan 2 soat keyin - 1-10 baholash so'rovi
+ *
+ * Qo'shimcha: "/start link_XXXX" -> dashboard "Profil sozlamalari"dagi
+ * "Telegramni ulash" tugmasidan kelgan deep-link, operatorning Telegram ID'sini
+ * profiles jadvaliga yozadi.
  */
 
 import { NextResponse } from "next/server";
@@ -52,7 +57,7 @@ export async function POST(req) {
   try {
     if (update.message?.contact) {
       await handleContact(update.message);
-    } else if (update.message?.text === "/start") {
+    } else if (update.message?.text?.startsWith("/start")) {
       await handleStart(update.message);
     } else if (update.message?.text === "/mijozlarim") {
       await handleMyLeadsCommand(update.message);
@@ -73,6 +78,14 @@ export async function POST(req) {
 // ============================================================================
 async function handleStart(message) {
   const userId = message.from.id;
+
+  // "/start link_ABC123" - dashboard'dagi "Telegramni ulash" tugmasidan kelgan
+  const parts = message.text.trim().split(" ");
+  const payload = parts[1];
+  if (payload && payload.startsWith("link_")) {
+    await handleLinkCode(userId, payload.replace("link_", ""));
+    return;
+  }
 
   const { data: existingLead } = await supabaseAdmin
     .from("telegram_leads")
@@ -103,6 +116,48 @@ async function handleStart(message) {
   );
 }
 
+// ============================================================================
+// 1.5) TELEGRAM AKKAUNTINI DASHBOARD HISOBIGA BOG'LASH
+// ============================================================================
+async function handleLinkCode(userId, code) {
+  const { data: linkRow } = await supabaseAdmin
+    .from("telegram_link_codes")
+    .select("*")
+    .eq("code", code)
+    .eq("used", false)
+    .maybeSingle();
+
+  if (!linkRow) {
+    await sendMessage(
+      userId,
+      "❌ Kod topilmadi yoki muddati o'tgan. Dashboard'dagi Profil sozlamalaridan yangi kod oling."
+    );
+    return;
+  }
+
+  const createdAt = new Date(linkRow.created_at).getTime();
+  if (Date.now() - createdAt > 10 * 60 * 1000) {
+    await sendMessage(userId, "❌ Kod muddati o'tgan (10 daqiqa). Dashboard'dan yangi kod oling.");
+    return;
+  }
+
+  await supabaseAdmin
+    .from("profiles")
+    .update({ telegram_user_id: userId })
+    .eq("id", linkRow.profile_id);
+
+  await supabaseAdmin
+    .from("telegram_link_codes")
+    .update({ used: true })
+    .eq("code", code);
+
+  await sendMessage(
+    userId,
+    "✅ Telegram akkauntingiz dashboard hisobingizga muvaffaqiyatli ulandi!\n\n" +
+      "Endi operatorlar guruhida lidlarni olganingizda, dashboard'dagi ism-familiyangiz ishlatiladi."
+  );
+}
+
 async function handleContact(message) {
   const userId = message.from.id;
 
@@ -121,7 +176,6 @@ async function handleContact(message) {
 
   const phone = message.contact.phone_number;
 
-  // --- Holat A: birlamchi ro'yxatdan o'tish ---
   if (fsm.state === "waiting_phone") {
     const fullName = fsm.data?.full_name || "-";
 
@@ -143,19 +197,6 @@ async function handleContact(message) {
     await askInterest(userId);
     return;
   }
-
-  // --- Holat B: "Batafsil ma'lumot" oqimida telefon qayta so'ralganda ---
-  if (fsm.state === "waiting_details_phone") {
-    const fullName = fsm.data?.full_name || "-";
-    await supabaseAdmin
-      .from("bot_fsm_state")
-      .update({ state: "waiting_details_stage", data: { ...fsm.data, phone } })
-      .eq("telegram_user_id", userId);
-
-    await sendMessage(userId, "Bosqichingizni tasdiqlang:", removeKeyboard());
-    await sendMessage(userId, "👇", confirmStageKeyboard());
-    return;
-  }
 }
 
 async function handleTextMessage(message) {
@@ -170,7 +211,6 @@ async function handleTextMessage(message) {
 
   if (!fsm) return;
 
-  // --- Birlamchi ro'yxatdan o'tish: ism ---
   if (fsm.state === "waiting_full_name") {
     if (text.split(" ").filter(Boolean).length < 2) {
       await sendMessage(userId, "Iltimos, ism va familiyangizni to'liq kiriting (masalan: Sardorbek Aliyev).");
@@ -188,25 +228,6 @@ async function handleTextMessage(message) {
     return;
   }
 
-  // --- "Batafsil ma'lumot" oqimi: ism ---
-  if (fsm.state === "waiting_details_name") {
-    if (text.split(" ").filter(Boolean).length < 2) {
-      await sendMessage(userId, "Iltimos, ism va familiyangizni to'liq kiriting.");
-      return;
-    }
-    await supabaseAdmin
-      .from("bot_fsm_state")
-      .update({ state: "waiting_details_phone", data: { full_name: text } })
-      .eq("telegram_user_id", userId);
-    await sendMessage(userId, "Endi telefon raqamingizni yuboring 👇", phoneShareKeyboard());
-    return;
-  }
-  if (fsm.state === "waiting_details_phone") {
-    await sendMessage(userId, "Iltimos, pastdagi tugma orqali telefon raqamingizni yuboring.", phoneShareKeyboard());
-    return;
-  }
-
-  // --- Operator: Demo sana/vaqt kiritish ---
   if (fsm.state === "awaiting_demo_datetime") {
     await handleOperatorDemoInput(userId, text, fsm.data?.leadId);
     return;
@@ -320,8 +341,6 @@ async function showResourceChannels(userId, interestType, businessStage) {
 // 4) "BATAFSIL MA'LUMOT" -> OPERATORLAR GURUHIGA YUBORISH
 // ============================================================================
 async function finalizeDetailsRequest(userId, chatId, messageId) {
-  // Ism, telefon va bosqich allaqachon ro'yxatdan o'tish bosqichida olingan -
-  // shuning uchun bu yerda hech narsa qayta so'ralmaydi, faqat statusi yangilanadi.
   const { data: lead } = await supabaseAdmin
     .from("telegram_leads")
     .update({ status: "Operatorga yuborildi" })
@@ -350,14 +369,27 @@ async function finalizeDetailsRequest(userId, chatId, messageId) {
 }
 
 // ============================================================================
-// 5) OPERATOR LIDNI "OLADI"
+// 5) OPERATOR LIDNI "OLADI" (dashboard profiliga bog'langan bo'lishi kerak)
 // ============================================================================
 async function handleClaim(callbackQuery, leadId) {
   const operatorId = callbackQuery.from.id;
-  const operatorName =
-    `${callbackQuery.from.first_name || ""} ${callbackQuery.from.last_name || ""}`.trim() ||
-    callbackQuery.from.username ||
-    "Operator";
+
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("id, first_name, last_name")
+    .eq("telegram_user_id", operatorId)
+    .maybeSingle();
+
+  if (!profile) {
+    await answerCallbackQuery(
+      callbackQuery.id,
+      "❗ Avval Telegram akkauntingizni dashboard hisobingizga ulang: Profil sozlamalari → \"Telegramni ulash\"",
+      { show_alert: true }
+    );
+    return;
+  }
+
+  const operatorName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Operator";
 
   const { data: lead } = await supabaseAdmin
     .from("telegram_leads")
@@ -382,20 +414,12 @@ async function handleClaim(callbackQuery, leadId) {
     .from("telegram_leads")
     .update({
       assigned_operator_id: operatorId,
+      assigned_operator_profile_id: profile.id,
       assigned_operator_name: operatorName,
       assigned_at: new Date().toISOString(),
       status: "Operator bilan aloqada",
     })
     .eq("id", leadId);
-
-  await supabaseAdmin.from("operators").upsert(
-    {
-      telegram_user_id: operatorId,
-      full_name: operatorName,
-      claimed_count: 1,
-    },
-    { onConflict: "telegram_user_id", ignoreDuplicates: false }
-  );
 
   const originalText = callbackQuery.message.text || "";
   await editMessageText(
@@ -499,7 +523,6 @@ async function handleOperatorDemoInput(operatorId, text, leadId) {
 
   await sendMessage(operatorId, `✅ Demo belgilandi: ${lead.full_name} - ${dateStr}`);
 
-  // 1) Mijozga darhol tasdiq
   await sendMessage(
     lead.telegram_user_id,
     `🎉 ${firstName}, tabriklaymiz! Siz Demo-darsga yozildingiz.\n\n` +
@@ -507,7 +530,6 @@ async function handleOperatorDemoInput(operatorId, text, leadId) {
       "Ko'rishguncha! Savol bo'lsa, operatoringizga yozishingiz mumkin."
   );
 
-  // 2) Eslatma xabarlarini rejalashtirish (pg_cron keyinroq yuboradi)
   const dayBefore = new Date(demoDate.getTime() - 24 * 60 * 60 * 1000);
   const hourBefore = new Date(demoDate.getTime() - 60 * 60 * 1000);
   const ratingTime = new Date(demoDate.getTime() + RATING_DELAY_HOURS * 60 * 60 * 1000);
