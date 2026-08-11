@@ -213,15 +213,7 @@ export default function ProfileSettings({ user, onSave }) {
               </Button>
             ) : (
               <div className="space-y-2">
-                
-                  href={linkUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex w-full items-center justify-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl"
-                  style={{ background: COLORS.primary, color: "#fff" }}
-                >
-                  <Send size={15} /> Botda ulashni yakunlash
-                </a>
+                <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="inline-flex w-full items-center justify-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl" style={{ background: COLORS.primary, color: "#fff" }}><Send size={15} /> Botda ulashni yakunlash</a>
                 <p className="text-xs" style={{ color: COLORS.sub }}>
                   Havola sizni to'g'ridan-to'g'ri botga olib boradi. Bosgach, avtomatik ulanadi.
                   Kod 10 daqiqa amal qiladi.
