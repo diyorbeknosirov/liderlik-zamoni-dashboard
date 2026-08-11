@@ -19,6 +19,9 @@
  * Qo'shimcha: "/start link_XXXX" -> dashboard "Profil sozlamalari"dagi
  * "Telegramni ulash" tugmasidan kelgan deep-link, operatorning Telegram ID'sini
  * profiles jadvaliga yozadi.
+ *
+ * Bot menyusi: /menu, /manzil, /mentor, /kurs buyruqlari (BotFather'da
+ * ro'yxatga olinishi kerak - README'ga qarang).
  */
 
 import { NextResponse } from "next/server";
@@ -40,13 +43,16 @@ import {
   formatDateTimeUz,
   INTEREST_LABELS,
   STAGE_LABELS,
+  mainMenuKeyboard,
 } from "@/lib/telegramBot/telegram";
+import { MENTOR_INFO_TEXT, KURS_INFO_TEXT, ADDRESS_INFO_TEXT } from "@/lib/telegramBot/menuContent";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const OPERATORS_GROUP_ID = process.env.OPERATORS_GROUP_ID;
 const RATING_DELAY_HOURS = 2;
+const DEMO_LOCATION_URL = "https://yandex.uz/maps/-/CTGMjNJ7";
 
 // ============================================================================
 // ASOSIY HANDLER
@@ -61,6 +67,14 @@ export async function POST(req) {
       await handleStart(update.message);
     } else if (update.message?.text === "/mijozlarim") {
       await handleMyLeadsCommand(update.message);
+    } else if (update.message?.text === "/menu") {
+      await sendMessage(update.message.from.id, "🏠 Asosiy menyu:", mainMenuKeyboard());
+    } else if (update.message?.text === "/manzil") {
+      await sendMessage(update.message.from.id, ADDRESS_INFO_TEXT);
+    } else if (update.message?.text === "/mentor") {
+      await sendMessage(update.message.from.id, MENTOR_INFO_TEXT);
+    } else if (update.message?.text === "/kurs") {
+      await sendMessage(update.message.from.id, KURS_INFO_TEXT);
     } else if (update.message?.text) {
       await handleTextMessage(update.message);
     } else if (update.callback_query) {
@@ -79,7 +93,6 @@ export async function POST(req) {
 async function handleStart(message) {
   const userId = message.from.id;
 
-  // "/start link_ABC123" - dashboard'dagi "Telegramni ulash" tugmasidan kelgan
   const parts = message.text.trim().split(" ");
   const payload = parts[1];
   if (payload && payload.startsWith("link_")) {
@@ -310,6 +323,24 @@ async function handleCallbackQuery(callbackQuery) {
     return;
   }
 
+  if (data === "menu_address") {
+    await sendMessage(userId, ADDRESS_INFO_TEXT);
+    await answerCallbackQuery(callbackQuery.id);
+    return;
+  }
+
+  if (data === "menu_mentor") {
+    await sendMessage(userId, MENTOR_INFO_TEXT);
+    await answerCallbackQuery(callbackQuery.id);
+    return;
+  }
+
+  if (data === "menu_kurs") {
+    await sendMessage(userId, KURS_INFO_TEXT);
+    await answerCallbackQuery(callbackQuery.id);
+    return;
+  }
+
   await answerCallbackQuery(callbackQuery.id);
 }
 
@@ -526,7 +557,8 @@ async function handleOperatorDemoInput(operatorId, text, leadId) {
   await sendMessage(
     lead.telegram_user_id,
     `🎉 ${firstName}, tabriklaymiz! Siz Demo-darsga yozildingiz.\n\n` +
-      `📅 Sana va vaqt: <b>${dateStr}</b>\n\n` +
+      `📅 Sana va vaqt: <b>${dateStr}</b>\n` +
+      `📍 Manzil: <a href="${DEMO_LOCATION_URL}">Xaritada ko'rish</a>\n\n` +
       "Ko'rishguncha! Savol bo'lsa, operatoringizga yozishingiz mumkin."
   );
 
@@ -546,7 +578,9 @@ async function handleOperatorDemoInput(operatorId, text, leadId) {
     },
     {
       telegram_user_id: lead.telegram_user_id,
-      message_text: `${firstName}, yordamdamisiz? Demoga kelayapsizmi? 😊`,
+      message_text:
+        `${firstName}, yordamdamisiz? Demoga kelayapsizmi? 😊\n\n` +
+        `📍 Manzil: <a href="${DEMO_LOCATION_URL}">Xaritada ko'rish</a>`,
       reply_markup: demoConfirmHourKeyboard(lead.id),
       send_at: hourBefore.toISOString(),
       purpose: "demo_hour_before",
